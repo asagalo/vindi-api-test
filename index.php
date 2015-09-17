@@ -48,9 +48,9 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
 
         // echo json_encode($sub);
         // exit;
-        
+
         /**/
-        $subscription = $subscriptionManager->create($sub);
+        $subscription = postHack($sub, $subscriptionManager);
 
         $redirect = $subscription->bill->charges[0]->print_url;
 
@@ -59,6 +59,27 @@ if($_SERVER['REQUEST_METHOD'] == "POST")
     } catch (\Exception $e) {
         echo $e->getMessage();
     }
+}
+
+function postHack($data, $resource)
+{
+    $vindi = new \Vindi\Vindi();
+
+    $data_string = json_encode($data);
+
+    $ch = curl_init(sprintf('%s%s', $vindi::$apiBase, $resource->url()));
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERPWD, $vindi->getApiKey() . ":");
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($data_string))
+    );
+
+    $result = curl_exec($ch);
+
+    return json_decode($result);
 }
 
 ?>
