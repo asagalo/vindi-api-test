@@ -8,41 +8,52 @@ date_default_timezone_set('America/Sao_Paulo');
 
 if($_SERVER['REQUEST_METHOD'] == "POST")
 {
-    $name  = $_POST['name'];
-    $email = $_POST['email'];
-
+    $subscriptionManager = new \Vindi\Subscription();
     $customerManager     = new \Vindi\Customer();
     $planManager         = new \Vindi\Plan();
-    $subscriptionManager = new \Vindi\Product();
-    $billManager         = new \Vindi\Bill();
 
     $payment_method = 'bank_slip';
     $start_at       = new \DateTime();
 
     try {
 
-        $plan = $planManager->get('3614');
+        $name  = $_POST['name'];
+        $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+
+        if(empty($name) OR empty($email))
+            throw new Exception('Dados Inválidos!');
+
+        $plan = $planManager->get(3614);
 
         $customer = $customerManager->create([
             'name' => $name,
             'email' => $email
         ]);
 
-        $items = array();
+        $sub = [
+            "plan_id"             => $plan->id,
+            "billing_trigger_day" => $start_at->format("d"),
+            "customer_id"         => $customer->id,
+            "payment_method_code" => $payment_method,
+            "product_items"       => array()
+        ];
 
         foreach($plan->plan_items as $item)
-            $items[] = (object) array('product_id' => $item->product->id);
+        {
+            $sub['product_items'][] = [
+                'product_id' => $item->product->id,
+                'cycles' => $item->cycles,
+            ];
+        }
 
-        $sub = array(
-            'plan_id'             => $plan->id,
-            'customer_id'         => $customer->id,
-            'payment_method_code' => $payment_method,
-            'product_items'       => $items
-        );
-
+        /**/
         $subscription = $subscriptionManager->create($sub);
 
-    } catch(\Vindi\Exceptions\ValidationException $e) {
+        $redirect = $subscription->bill->charges[0]->print_url;
+
+        header('Location: ' . $redirect);
+
+    } catch (\Exception $e) {
         echo $e->getMessage();
     }
 }
